@@ -1,0 +1,6 @@
+protoc-zig/inc/protobuf.zig.hpp
+protoc-zig/build
+generated/*
+.cache
+zig-cache
+zig-out
