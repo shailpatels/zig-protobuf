@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+message Test1 {
+  int32 a = 1;
+}
+
+
+message BasicRepeated {
+  repeated bool a = 1;
+  int32 b = 2;
+  repeated float c = 3;
+}
+
+
+message RepeatedStrings {
+  repeated string a = 1;
+  int32 b = 2;
+}
+
+message NestedMessage {
+    message Nestee {
+        string b = 1;
+    }
+
+    Nestee a = 1;
+}

@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+message Foo {
+  double a = 1;
+  float b = 2;
+  int32 c = 3;
+  int64  d= 4;
+  repeated uint32 e = 5;
+  uint64 f = 6;
+  sint32 g = 7;
+  uint64 h = 8;
+  sint32 i = 9;
+  sint64 j = 10;
+  fixed32 k = 11;
+  fixed64 l = 12;
+  sfixed32 m = 13;
+  sfixed64 n = 14;
+  bool o = 15;
+  repeated string p = 16;
+  bytes q = 17;
+
+  reserved 20;
+  reserved "test";
+}
+
+
+message Street {
+  StopLight a = 1;
+  StopLight b = 2;
+
+  Foo c = 3;
+
+  map<string, Street> projects = 4;
+
+  string test = 5;
+}
+
+
+message Nested{
+  string nested_string = 1;
+}
+
+message Nestee{
+  Nested a = 1;
+  repeated Nested b = 2;
+
+  enum nested_enum{
+    c = 0;
+    d = 1;
+  }
+}
+
+
+//TODO handle tag type for generated enums
+enum StopLight {
+  red = 0;
+  yellow = 1;
+  green = 2;
+}
+
+
+message OneOfTest {
+  oneof test_oneof {
+    string name = 1;
+    Nested sub = 2;
+  }
+
+  bool next = 3;
+}
+
+
+message OneOfTestTwo{
+  oneof test_oneof2{
+    string a = 1;
+  }
+}
+
+message ManyNested{
+  message Level1{
+    message Level2{
+      message Level3{
+        string word = 1;
+      }
+    }
+  }
+}
