@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 pub const DecodeError = error{ InvalidField, InvalidWireType, OutOfMemory };
+pub const EncodeError = error{OutOfMemory};
 
 //https://protobuf.dev/programming-guides/encoding/#structure
 const WireType = enum(u8) { VARINT, I64, LEN, SGROUP, EGROUP, I32 };
@@ -161,6 +162,14 @@ fn readNumericIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: [
     return 0;
 }
 
+fn IsStruct(comptime T: type) bool {
+    return @typeInfo(T) == @typeInfo(std.builtin.Type).Union.tag_type.?.Struct;
+}
+
+fn IsArray(comptime T: type) bool {
+    return @hasField(T, "items");
+}
+
 ///inject a type thats represented as a protobuf len, type should be strings, bytes, nested messages
 fn injectLenIntoStruct(comptime T: type, msg: *T, field_number: u64, comptime V: type, value: V, allocator: Allocator) !void {
     const tgt_field_name = @tagName(@intToEnum(T.descriptor_pool, field_number));
@@ -171,17 +180,15 @@ fn injectLenIntoStruct(comptime T: type, msg: *T, field_number: u64, comptime V:
         if (std.mem.eql(u8, f.name, tgt_field_name)) {
             if (comptime V == []const u8 and f.field_type == V) {
                 @field(msg.*, f.name) = value;
-            } else if (comptime @typeInfo(f.field_type) == @typeInfo(std.builtin.Type).Union.tag_type.?.Struct) {
-                if (@hasField(f.field_type, "items")) {
-                    //working with array
-
+            } else if (comptime IsStruct(f.field_type)) {
+                if (comptime IsArray(f.field_type)) {
                     //TODO get array_type at comptime
                     const array_type = @typeInfo(@TypeOf(@field(msg.*, f.name).items)).Pointer.child;
                     if (@field(msg.*, f.name).capacity == 0) {
                         @field(msg.*, f.name) = ArrayList(array_type).init(allocator);
                     }
 
-                    var index: u32 = 0;
+                    var index: u64 = 0;
                     while (index < value.len) {
                         switch (array_type) {
                             bool => {
@@ -197,8 +204,8 @@ fn injectLenIntoStruct(comptime T: type, msg: *T, field_number: u64, comptime V:
                             f32, f64 => {
                                 const num_bytes = @sizeOf(array_type);
                                 var cpy_buffer = [_]u8{0} ** num_bytes;
-                                std.mem.copy(u8, &cpy_buffer, value[index..index + num_bytes]);
-                                var result: *array_type= @ptrCast(*array_type, @alignCast(num_bytes, &cpy_buffer));
+                                std.mem.copy(u8, &cpy_buffer, value[index .. index + num_bytes]);
+                                var result: *array_type = @ptrCast(*array_type, @alignCast(num_bytes, &cpy_buffer));
                                 try @field(msg.*, f.name).append(@floatCast(array_type, result.*));
                                 index += num_bytes;
                             },
@@ -206,7 +213,11 @@ fn injectLenIntoStruct(comptime T: type, msg: *T, field_number: u64, comptime V:
                                 try @field(msg.*, f.name).append(value[index..]);
                                 index += @intCast(u32, value.len);
                             },
-                            else => unreachable,
+                            else => {
+                                if (IsStruct(array_type)) {
+                                    try @field(msg.*, f.name).append( try DecodeMessage(array_type, &index, value[index..], allocator) );
+                                } else unreachable;
+                            },
                         }
                     }
                 } else {

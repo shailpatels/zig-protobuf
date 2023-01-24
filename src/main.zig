@@ -109,6 +109,23 @@ test "Decode simple.RepeatedStrings.1.bin" {
 
 }
 
+test "Decode simple.BasicMap.1.bin" {
+    const message = @import("generated/simple.pb.zig");
+
+    const data = @embedFile("generated/simple.BasicMap.1.bin");
+    std.debug.print("{x}\n", .{std.fmt.fmtSliceHexLower(data)});
+    const msg = try ProtobufMessage(message.BasicMap).ParseFromString(data, std.testing.allocator);
+
+    try expect(std.mem.eql(u8, "A", msg.map_field.items[0].key)); 
+    try expect(std.mem.eql(u8, "B", msg.map_field.items[1].key)); 
+    try expect(std.mem.eql(u8, "C", msg.map_field.items[2].key)); 
+    try std.testing.expectEqual(@as(i32, 1), msg.map_field.items[0].value);
+    try std.testing.expectEqual(@as(i32, 2), msg.map_field.items[1].value);
+    try std.testing.expectEqual(@as(i32, 3), msg.map_field.items[2].value);
+    msg.map_field.deinit();
+
+}
+
 test "Encode simple.Test1.1.bin" {
 
     //const message = @import("generated/simple.pb.zig");

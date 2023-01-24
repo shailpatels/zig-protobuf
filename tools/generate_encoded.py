@@ -70,6 +70,16 @@ test_cases = [
         ]
     },
     {
+        "message_name" : "BasicMap",
+        "file" : "simple.proto",
+        "output_name" : "simple.BasicMap.1.bin",
+        "data" : [
+            "map_field:{key:\"A\", value:1}"  
+            "map_field:{key:\"B\", value:2}"  
+            "map_field:{key:\"C\", value:3}"  
+        ]
+    },
+    {
         "message_name" : "test.SearchRequest",
         "file" : "message.proto",
         "output_name" : "message.SearchRequest.1.bin",

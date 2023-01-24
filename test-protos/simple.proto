@@ -24,3 +24,7 @@ message NestedMessage {
 
     Nestee a = 1;
 }
+
+message BasicMap {
+    map<string, int32> map_field = 1;
+}
