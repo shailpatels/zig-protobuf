@@ -6,6 +6,46 @@ Zig-Protobuf is an implementation of [Google's Protocal Buffers (Protobuf)](http
 is currently in development and incomplete. It has two parts, `protoc-zig`, a protoc plugin that parses `.proto` files
 and generates zig code, and a Protobuf interface that is currently focused on serializing the protobuf wire format.
 
+The goal is to take `.proto` files and produce readable zig code with an easy to use encoding and decoding API that
+can be used in zig programs. Here is an example of the output of parsing a `.proto` message *(imports are not shown)*
+
+<table>
+<tr>
+<th>message.proto</th>
+<th>message.pb.zig</th>
+</tr>
+<tr>
+<td>
+
+```proto
+message SearchRequest {
+    string query = 1;
+    int32 page_number = 2;
+    int32 result_per_page = 3;
+}
+```
+</td>
+<td>
+
+```zig
+pub const SearchRequest = struct{
+    query: []const u8 = "",
+    page_number: i32 = 0,
+    result_per_page: i32 = 0,
+
+    pub const descriptor_pool = enum(u32){page_number = 2,query = 1,result_per_page = 3};
+    pub fn ParseFromString(string: []const u8, allocator: Allocator) DecodeError!SearchRequest{
+        return ProtobufMessage(SearchRequest).ParseFromString(string, allocator);
+    }
+    pub fn SerializeToString(message: SearchRequest, allocator: Allocator) []const u8 {
+        return ProtobufMessage(SearchRequest).SerializeToString(message, allocator);
+    }
+};
+```
+</td>
+</tr>
+</table>
+
 ## Usage
 
 You will need `protoc` installed, see the installation on the [protobuf GitHub Repo](https://github.com/protocolbuffers/protobuf#protocol-compiler-installation).
