@@ -1,0 +1,30 @@
+name: Build protoc-zig
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "main" ]
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup zig
+      run: |
+        sudo snap install zig --classic --beta
+        zig version
+
+    - name: Configure CMake
+      run: CXX="zig c++" CC="zig cc" cmake -B ${{github.workspace}}/build
+
+    - name: Build
+      run: |
+        pushd build
+        make
+
+
