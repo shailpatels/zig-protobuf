@@ -13,7 +13,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      PROTOBUF_URL: "https://github.com/protocolbuffers/protobuf/releases/download/v21.12/${PROTOBUF_VER}.tar.gz"
 
     steps:
     - uses: actions/checkout@v3
@@ -26,8 +25,9 @@ jobs:
     # https://github.com/protocolbuffers/protobuf/blob/main/cmake/README.md
     - name: Install Protobuf
       run: |
-        echo "URL: ${PROTOBUF_URL}"
-        wget -qO- $PROTOBUF_URL | tar xvz
+        URL="https://github.com/protocolbuffers/protobuf/releases/download/v21.12/${PROTOBUF_VER}.tar.gz"
+        echo "downloading from: ${URL}"
+        wget -qO- $URL | tar xvz
         cd $PROTOBUF_VER
         CXX="zig c++" CC="zig cc" cmake . 
         cmake --build . --parallel 10
