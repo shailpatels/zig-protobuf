@@ -7,7 +7,8 @@ is currently in development and incomplete. It has two parts, `protoc-zig`, a pr
 and generates zig code, and a Protobuf interface that is currently focused on serializing the protobuf wire format.
 
 The goal is to take `.proto` files and produce readable zig code with an easy to use encoding and decoding API that
-can be used in zig programs. Here is an example of the output of parsing a `.proto` message *(imports are not shown)*
+can be used in zig programs. Here is an example of the output of parsing a `.proto` message *(imports are not shown, using proto3
+syntax)*
 
 <table>
 <tr>
