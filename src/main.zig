@@ -126,17 +126,22 @@ test "Decode simple.BasicMap.1.bin" {
 
 }
 
+test "Handle empty message" {
+    const message = @import("generated/simple.pb.zig");
+    const msg = try ProtobufMessage(message.EmptyMessage).ParseFromString("", std.testing.allocator);
+    _ = ProtobufMessage(message.EmptyMessage).SerializeToString(msg, std.testing.allocator);
+
+}
+
 test "Encode simple.Test1.1.bin" {
+    const message = @import("generated/simple.pb.zig");
+    const msg_1 = message.Test1{ .a = 150 };
 
-    //const message = @import("generated/simple.pb.zig");
-    //const msg_1 = message.Test1{ .a = 150 };
 
-    //_ = msg_1.descriptor_pool;
+    const data = ProtobufMessage(message.Test1).SerializeToString(msg_1, std.testing.allocator);
 
-    //const data = ProtobufMessage(message.Test1).SerializeToString(msg_1, std.testing.allocator);
-
-    //std.debug.print("got: {x}\n", .{std.fmt.fmtSliceHexLower(data)});
-    //try std.testing.expect(std.mem.eql(u8, @embedFile("generated/simple.Test1.1.bin"), data));
+    std.debug.print("got: {x}\n", .{std.fmt.fmtSliceHexLower(data)});
+    try std.testing.expect(std.mem.eql(u8, @embedFile("generated/simple.Test1.1.bin"), data));
 }
 
 fn readFile(comptime tgt_filename: []const u8) ![]u8 {

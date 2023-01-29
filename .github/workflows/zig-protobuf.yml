@@ -1,0 +1,56 @@
+name: Build protoc-zig
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  PROTOBUF_VER: 3.21.12
+
+jobs:
+  Build-Test-Protoc-Zig:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup zig
+      run: |
+        sudo snap install zig --classic --beta
+        zig version
+
+    # https://github.com/protocolbuffers/protobuf/blob/main/cmake/README.md
+    - name: Install Protobuf
+      run: |
+        URL="https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protobuf-cpp-${PROTOBUF_VER}.tar.gz"
+        echo "downloading from: ${URL}"
+        wget -qO- $URL | tar xvz
+        cd protobuf-$PROTOBUF_VER
+        CXX="zig c++" CC="zig cc" cmake . 
+        cmake --build . --parallel 10
+        sudo cmake --install .
+ 
+    - name: Configure CMake
+      run: |
+        pushd ${{github.workspace}}/protoc-zig
+        mkdir build
+        pushd build
+        CXX="zig c++" CC="zig cc" cmake ..
+
+    - name: Build
+      run: |
+        pushd ${{github.workspace}}/tools
+        python3 prepare_env.py
+        pushd ${{github.workspace}}/protoc-zig/build
+        make
+
+    - name: Test
+      run: |
+        pushd ${{github.workspace}}/tools
+        python3 generate_zig_protobuf.py
+        python3 generate_encoded.py
+        cd ..
+        zig test src/main.zig
+
