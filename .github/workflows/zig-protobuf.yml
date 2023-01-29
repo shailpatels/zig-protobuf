@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  PROTOBUF_URL: https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protobuf-cpp-3.21.12.tar.gz
 
 jobs:
   build:
@@ -13,6 +15,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Install Protobuf
+      run: |
+        wget -q0- $PROTOBUF_URL | tar xvz
+        ls 
     
     - name: Setup zig
       run: |
