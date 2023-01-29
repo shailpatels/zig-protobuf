@@ -30,7 +30,7 @@ jobs:
         cd protobuf-$PROTOBUF_VER
         CXX="zig c++" CC="zig cc" cmake . 
         cmake --build . --parallel 10
-        sudo cmake --install
+        sudo cmake --install .
  
     - name: Configure CMake
       run: |
