@@ -20,11 +20,14 @@ jobs:
         zig version
 
     - name: Configure CMake
-      run: CXX="zig c++" CC="zig cc" cmake -B ${{github.workspace}}/protoc-zig/build
+      run: |
+        cd ${{github.workspace}}/protoc-zig
+        mkdir build
+        pushd build
+        CXX="zig c++" CC="zig cc" cmake ..
 
     - name: Build
       run: |
-        pushd protoc-zig/build
         make
 
 
