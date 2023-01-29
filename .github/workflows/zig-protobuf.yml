@@ -7,7 +7,8 @@ on:
     branches: [ "main" ]
 
 env:
-  PROTOBUF_URL: https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protobuf-cpp-3.21.12.tar.gz
+  PROTOBUF_VER: protobuf-3.21.12
+  PROTOBUF_URL: "https://github.com/protocolbuffers/protobuf/releases/download/v21.12/${PROTOBUF_VER}.tar.gz"
 
 jobs:
   build:
@@ -16,16 +17,20 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install Protobuf
-      run: |
-        wget -qO- $PROTOBUF_URL | tar xvz
-        ls 
-    
     - name: Setup zig
       run: |
         sudo snap install zig --classic --beta
         zig version
 
+    # https://github.com/protocolbuffers/protobuf/blob/main/cmake/README.md
+    - name: Install Protobuf
+      run: |
+        wget -qO- $PROTOBUF_URL | tar xvz
+        cd $PROTOBUF_VER
+        CXX="zig c++" CC="zig cc" cmake . 
+        cmake --build . --parallel 10
+        sudo cmake --install
+ 
     - name: Configure CMake
       run: |
         cd ${{github.workspace}}/protoc-zig
