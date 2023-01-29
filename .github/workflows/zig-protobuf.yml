@@ -8,11 +8,12 @@ on:
 
 env:
   PROTOBUF_VER: protobuf-3.21.12
-  PROTOBUF_URL: "https://github.com/protocolbuffers/protobuf/releases/download/v21.12/${PROTOBUF_VER}.tar.gz"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      PROTOBUF_URL: "https://github.com/protocolbuffers/protobuf/releases/download/v21.12/${PROTOBUF_VER}.tar.gz"
 
     steps:
     - uses: actions/checkout@v3
