@@ -47,9 +47,9 @@ pub fn ProtobufMessage(comptime T: type) type {
 }
 
 fn DecodeMessage(comptime T: type, bytes_read: *u64, buffer: []const u8, allocator: Allocator) DecodeError!T {
-    var message_result = T{};
-    if(comptime !@hasField(T, "descriptor_pool")) return message_result; //empty message
+    if(!@hasDecl(T, "descriptor_pool")) return T{};
 
+    var message_result = T{};
     var position: u64 = 0;
 
     while (position < buffer.len) {
@@ -144,7 +144,7 @@ fn readVarintIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: []
 ///inject fixed32, sfixed32, float, fixed64, sfixed64, double into message, returns the bytes read from the buffer
 fn readNumericIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: []const u8) u32 {
     const tgt_field_name = @tagName(@intToEnum(T.descriptor_pool, field_number));
-    std.debug.print("adding value into {s} \n", .{tgt_field_name});
+    //std.debug.print("adding value into {s} \n", .{tgt_field_name});
     inline for (@typeInfo(T).Struct.fields) |f| {
         if (std.mem.eql(u8, f.name, tgt_field_name)) {
             if (comptime f.field_type == f64 or f.field_type == f32 or f.field_type == i64 or f.field_type == i32) {
