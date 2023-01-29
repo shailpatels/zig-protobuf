@@ -25,6 +25,7 @@ jobs:
     # https://github.com/protocolbuffers/protobuf/blob/main/cmake/README.md
     - name: Install Protobuf
       run: |
+        echo "URL: ${PROTOBUF_URL}"
         wget -qO- $PROTOBUF_URL | tar xvz
         cd $PROTOBUF_VER
         CXX="zig c++" CC="zig cc" cmake . 
