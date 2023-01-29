@@ -41,7 +41,16 @@ jobs:
 
     - name: Build
       run: |
+        pushd ${{github.workspace}}/tools
+        python3 prepare_env.py
         pushd ${{github.workspace}}/protoc-zig/build
         make
 
+    - name: Test
+      run: |
+        pushd ${{github.workspace}}/tools
+        python3 generate_zig_protobuf.py
+        python3 generate_encoded.py
+        cd ..
+        zig test src/main.zig
 
