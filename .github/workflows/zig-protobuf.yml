@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 env:
-  PROTOBUF_VER: protobuf-3.21.12
+  PROTOBUF_VER: protobuf-cpp-3.21.12
 
 jobs:
   build:
