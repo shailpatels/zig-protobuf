@@ -18,7 +18,7 @@ jobs:
 
     - name: Install Protobuf
       run: |
-        wget -q0- $PROTOBUF_URL | tar xvz
+        wget -qO- $PROTOBUF_URL | tar xvz
         ls 
     
     - name: Setup zig
