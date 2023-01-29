@@ -10,7 +10,7 @@ env:
   PROTOBUF_VER: 3.21.12
 
 jobs:
-  build:
+  Build-Test-Protoc-Zig:
     runs-on: ubuntu-latest
 
     steps:

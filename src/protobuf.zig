@@ -48,6 +48,8 @@ pub fn ProtobufMessage(comptime T: type) type {
 
 fn DecodeMessage(comptime T: type, bytes_read: *u64, buffer: []const u8, allocator: Allocator) DecodeError!T {
     var message_result = T{};
+    if(comptime !@hasField(T, "descriptor_pool")) return message_result; //empty message
+
     var position: u64 = 0;
 
     while (position < buffer.len) {
