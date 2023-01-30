@@ -22,27 +22,22 @@ class ZigGenerator : public  google::protobuf::compiler::CodeGenerator
 {
 
 public:
-
-/**
- * Invoke the generator, gets called by google::protobuf::compiler::PluginMain
- */
-bool GenerateAll(const std::vector<const google::protobuf::FileDescriptor*>&, const std::string&,
+    /**
+     * Invoke the generator, gets called by google::protobuf::compiler::PluginMain
+     */
+    bool GenerateAll(const std::vector<const google::protobuf::FileDescriptor*>&, const std::string&,
                     google::protobuf::compiler::GeneratorContext*, std::string* ) const override;
 
-
-bool Generate(const google::protobuf::FileDescriptor*, const std::string&, 
+    bool Generate(const google::protobuf::FileDescriptor*, const std::string&, 
                     google::protobuf::compiler::GeneratorContext*, std::string* ) const override;
-
 
 private:
-
-void ProcessMessage(const google::protobuf::Descriptor*, Formatter&) const;
-void ProccessField(const google::protobuf::FieldDescriptor*, Formatter&, bool = false) const; 
-void ProcessEnum(const google::protobuf::EnumDescriptor*, Formatter&) const;
-void BuildDescriptorPool(const std::map<std::string, u_int>&, Formatter&) const;
-
-const std::string indent = "    ";
-
+    /** Functions to handle parsing and generating code for the different parts of a protobuf message */
+    void ProcessMessage(const google::protobuf::Descriptor*, Formatter&) const;
+    void ProccessField(const google::protobuf::FieldDescriptor*, Formatter&, bool = false) const; 
+    void ProcessEnum(const google::protobuf::EnumDescriptor*, Formatter&) const;
+    void BuildDescriptorPool(const std::map<std::string, u_int>&, const std::vector<std::string>&, Formatter&) const;
+    bool IsZigZagEncoded(const google::protobuf::FieldDescriptor*) const;
 };
 
 }

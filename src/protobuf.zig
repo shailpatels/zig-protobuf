@@ -79,7 +79,7 @@ fn DecodeMessage(comptime T: type, bytes_read: *u64, buffer: []const u8, allocat
 
         switch (wire_type) {
             @enumToInt(WireType.VARINT) => {
-                position += readVarintIntoStruct(T, &message_result, field_number, buffer[position..]);
+                position += readVarintIntoStruct(T, &message_result, field_number, buffer[position..]) catch return DecodeError.InvalidField;
             },
             @enumToInt(WireType.I64) => {
                 position += readNumericIntoStruct(T, &message_result, field_number, buffer[position..]);
@@ -115,13 +115,19 @@ fn GetWireTypeFromField() WireType {
 }
 
 ///inject int32, int64, uint32, uint64, sint32, sint64, bool, enum into message, returns the bytes read from the buffer
-fn readVarintIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: []const u8) u32 {
-    const tgt_field_name = @tagName(@intToEnum(T.descriptor_pool, field_number));
+fn readVarintIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: []const u8) std.meta.IntToEnumError!u32 {
+    const tgt_field_enum = try std.meta.intToEnum(T.descriptor_pool, field_number);
+    const tgt_field_name = @tagName(tgt_field_enum);
+
     inline for (@typeInfo(T).Struct.fields) |f| {
         if (std.mem.eql(u8, f.name, tgt_field_name)) {
             var tgt_field = &@field(msg.*, f.name);
             if (comptime f.field_type == i64 or f.field_type == i32) {
-                const result = decodeVarint(i64, buffer);
+                var result = decodeVarint(i64, buffer);
+                if(IsZigZagEncoded(T.zig_zag_encoded, tgt_field_name)){
+                   result.value = (result.value >> 1) ^ (-(result.value & 1));
+                }
+
                 tgt_field.* = @intCast(f.field_type, result.value);
                 return result.bytes_read;
             } else if (comptime f.field_type == u64 or f.field_type == u32) {
@@ -170,6 +176,15 @@ fn IsStruct(comptime T: type) bool {
 
 fn IsArray(comptime T: type) bool {
     return @hasField(T, "items");
+}
+
+fn IsZigZagEncoded(zig_zag_encoded: anytype, field_name: []const u8) bool {
+    if(comptime std.meta.fields(zig_zag_encoded).len > 0){ 
+        _ = std.meta.stringToEnum(zig_zag_encoded, field_name) orelse return false;
+        return true;
+    }else {
+        return false;
+    }
 }
 
 ///inject a type thats represented as a protobuf len, type should be strings, bytes, nested messages

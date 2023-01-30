@@ -76,7 +76,8 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
 {
     //create the struct definition
     formatter.WriteLine({"pub const ", Formatter::GetZigName(message->name()), " = struct{"}).PushIndent();
-    std::map<std::string, u_int> field_names;
+    std::map<std::string, u_int> field_names;   //map field names to their proto field number for a descriptor_pool
+    std::vector<std::string> zig_zag_encoded;   //heh 'zig'
 
     //handle any nested messages
     for(int i = 0; i < message->nested_type_count(); i++){
@@ -92,11 +93,13 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
     {
         const google::protobuf::FieldDescriptor* field = message->field(i);
         if(field->containing_oneof() == nullptr){
-
             ProccessField(field, formatter);
             formatter.NoIndent().Write({","}).NewLine().UseIndent();
 
             field_names.insert({ field->name(), field->number() });
+            if(IsZigZagEncoded(field)){
+                zig_zag_encoded.push_back(field->name());
+            }
         }
     }
 
@@ -105,7 +108,6 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
     {
         //handle any oneofs as a union inside of this struct
         const google::protobuf::OneofDescriptor* oneof = message->oneof_decl(i);
-
         formatter.WriteLine({"pub const ", oneof->name(), " = union{" }).PushIndent();
 
         for(int j = 0; j < oneof->field_count(); j++)
@@ -121,8 +123,7 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
         formatter.PopIndent().WriteLine({"};"});
     }
 
-    BuildDescriptorPool(field_names, formatter);
-
+    formatter.WriteLine({""});
     //insert helper functions
     formatter.WriteLine({"pub fn ParseFromString(string: []const u8, allocator: Allocator) DecodeError!", Formatter::GetZigName(message->name()), "{"})
         .PushIndent()
@@ -134,6 +135,9 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
         .WriteLine({"return ProtobufMessage(", Formatter::GetZigName(message->name()), ").SerializeToString(message, allocator);"})
         .PopIndent().WriteLine({"}"});
 
+    //metadata for parsing wire format into this message
+    BuildDescriptorPool(field_names, zig_zag_encoded, formatter);
+
     formatter.PopIndent().WriteLine({"};"});
 }
 
@@ -141,7 +145,7 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
 /**
  * Add a new field to the struct we're building 
  */
-void ZigGenerator::ProccessField(const google::protobuf::FieldDescriptor* field,  Formatter& formatter, bool is_union) const 
+void ZigGenerator::ProccessField(const google::protobuf::FieldDescriptor* field, Formatter& formatter, bool is_union) const 
 {
     const std::string field_name = Formatter::GetZigName(field->name());
     const std::string is_repeated = field->is_repeated() ? "std.ArrayList(" : "";
@@ -159,9 +163,9 @@ void ZigGenerator::ProccessField(const google::protobuf::FieldDescriptor* field,
             default_type = "0";
             break;
         case FieldDescriptor::Type::TYPE_INT64:
+        case FieldDescriptor::Type::TYPE_SINT64:
         case FieldDescriptor::Type::TYPE_FIXED64:
         case FieldDescriptor::Type::TYPE_SFIXED64:
-        case FieldDescriptor::Type::TYPE_SINT64:
             formatter.Write({field_name, ": ", is_repeated, "i64"});
             default_type = "0";
             break;
@@ -170,9 +174,9 @@ void ZigGenerator::ProccessField(const google::protobuf::FieldDescriptor* field,
             default_type = "0";
             break;
         case FieldDescriptor::Type::TYPE_INT32:
+        case FieldDescriptor::Type::TYPE_SINT32:
         case FieldDescriptor::Type::TYPE_FIXED32:
         case FieldDescriptor::Type::TYPE_SFIXED32:
-        case FieldDescriptor::Type::TYPE_SINT32:
             formatter.Write({field_name, ": ", is_repeated, "i32"});
             default_type = "0";
             break;
@@ -236,27 +240,33 @@ void ZigGenerator::ProcessEnum(const google::protobuf::EnumDescriptor* enum_type
 /**
  * Map the field names with their tag numbers so we can perform the lookup when decoding and assigning values
  */
-void ZigGenerator::BuildDescriptorPool(const std::map<std::string, u_int>& field_names, Formatter& formatter) const
+void ZigGenerator::BuildDescriptorPool(const std::map<std::string, u_int>& field_names, const std::vector<std::string>& zig_zag_encoded, Formatter& formatter) const
 {
     //if there are no values, do not create an empty enum set
     if(field_names.size() == 0)
         return;
 
     formatter.NewLine().Write({"pub const descriptor_pool = enum(u32){"});
+    for(const auto& pair : field_names){
+        formatter.NoIndent().Write({Formatter::GetZigName(pair.first), " = ", std::to_string(pair.second)}).Write({","});
+    }
 
-    u_int index = 0;
-    for(const auto& pair : field_names)
-    {
-        formatter.NoIndent().Write({Formatter::GetZigName(pair.first), " = ", std::to_string(pair.second)});
-        if(index != field_names.size()-1)
-        {
-            formatter.Write({","});
-        }
-
-        index ++;
+    formatter.Write({"};"}).NewLine().UseIndent().Write({"pub const zig_zag_encoded = enum{"});
+    for(const auto& field : zig_zag_encoded){
+        formatter.NoIndent().Write({Formatter::GetZigName(field)}).Write({","});
     }
 
     formatter.Write({"};"}).NewLine().UseIndent();
+}
+
+
+/**
+ * returns if a field is ZigZag encoded (sint32,sint64 varints)
+ */
+bool ZigGenerator::IsZigZagEncoded(const google::protobuf::FieldDescriptor* field) const
+{
+    using namespace google::protobuf;
+    return field->type() == FieldDescriptor::TYPE_SINT32 || field->type() == FieldDescriptor::TYPE_SINT64;
 }
 
 }
