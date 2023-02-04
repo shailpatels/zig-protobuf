@@ -130,9 +130,9 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
         .WriteLine({"return ProtobufMessage(", Formatter::GetZigName(message->name()), ").ParseFromString(string, allocator);"})
         .PopIndent().WriteLine({"}"});
     
-    formatter.WriteLine({"pub fn SerializeToString(message: ", Formatter::GetZigName(message->name()), ", allocator: Allocator) []const u8 {"})
+    formatter.WriteLine({"pub fn SerializeToWriter(message: ", Formatter::GetZigName(message->name()), ", allocator: Allocator) []const u8 {"})
         .PushIndent()
-        .WriteLine({"return ProtobufMessage(", Formatter::GetZigName(message->name()), ").SerializeToString(message, allocator);"})
+        .WriteLine({"return ProtobufMessage(", Formatter::GetZigName(message->name()), ").SerializeToWriter(message, allocator);"})
         .PopIndent().WriteLine({"}"});
 
     //metadata for parsing wire format into this message
@@ -184,8 +184,11 @@ void ZigGenerator::ProccessField(const google::protobuf::FieldDescriptor* field,
             formatter.Write({field_name, ": ", is_repeated, "bool"});
             default_type = "false";
             break;
-        case FieldDescriptor::Type::TYPE_STRING:
         case FieldDescriptor::Type::TYPE_BYTES:
+            formatter.Write({field_name, ": ", is_repeated, "[]u8"});
+            default_type = "\"\"";
+            break;
+        case FieldDescriptor::Type::TYPE_STRING:
             formatter.Write({field_name, ": ", is_repeated, "[]const u8"});
             default_type = "\"\"";
             break;

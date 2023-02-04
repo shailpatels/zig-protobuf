@@ -3,7 +3,7 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 pub const DecodeError = error{ InvalidField, InvalidWireType, OutOfMemory };
-pub const EncodeError = error{OutOfMemory};
+pub const EncodeError = error{ OutOfMemory };
 
 //https://protobuf.dev/programming-guides/encoding/#structure
 const WireType = enum(u8) { VARINT, I64, LEN, SGROUP, EGROUP, I32 };
@@ -20,28 +20,8 @@ pub fn ProtobufMessage(comptime T: type) type {
         }
 
         //Incomplete
-        pub fn SerializeToString(message: T, _: Allocator) []u8 {
-            var buffer = [_]u8{0};
-            inline for (@typeInfo(T).Struct.fields) |f| {
-                std.debug.print("field {s}\n", .{f.name});
-
-                const tgt_field_name = @field(T.descriptor_pool, f.name);
-                const tgt_field_number = @enumToInt(tgt_field_name);
-                const wire_type = GetWireTypeFromField();
-
-                const tag = (tgt_field_number << 3) | @enumToInt(wire_type);
-
-                switch (wire_type) {
-                    WireType.VARINT => {
-                        AppendVarInt(&buffer, @intCast(u64, @field(message, f.name)));
-                    },
-                    else => {},
-                }
-
-                std.debug.print("reading from {} got tag {}\n", .{ tgt_field_name, tag });
-            }
-
-            return "";
+        pub fn SerializeToWriter(message: T, writer: anytype) EncodeError!void {
+            return try EncodeMessage(T, message, writer);    
         }
     };
 }
@@ -82,7 +62,7 @@ fn DecodeMessage(comptime T: type, bytes_read: *u64, buffer: []const u8, allocat
                 position += readVarintIntoStruct(T, &message_result, field_number, buffer[position..]) catch return DecodeError.InvalidField;
             },
             @enumToInt(WireType.I64) => {
-                position += readNumericIntoStruct(T, &message_result, field_number, buffer[position..]);
+                position += readNumericIntoStruct(T, &message_result, field_number, buffer[position..]) catch return DecodeError.InvalidField;
             },
             @enumToInt(WireType.LEN) => {
                 const result = decodeVarint(u64, buffer[position..]);
@@ -92,7 +72,7 @@ fn DecodeMessage(comptime T: type, bytes_read: *u64, buffer: []const u8, allocat
                 position += result.value;
             },
             @enumToInt(WireType.I32) => {
-                position += readNumericIntoStruct(T, &message_result, field_number, buffer[position..]);
+                position += readNumericIntoStruct(T, &message_result, field_number, buffer[position..]) catch return DecodeError.InvalidField;
             },
             else => {
                 std.debug.print("received a wire type that cannot be handled: {}\n", .{wire_type});
@@ -109,10 +89,7 @@ fn VarIntResult(comptime T: type) type {
     return struct { value: T, bytes_read: u32 };
 }
 
-fn GetWireTypeFromField() WireType {
-    //TODO
-    return WireType.VARINT;
-}
+
 
 ///inject int32, int64, uint32, uint64, sint32, sint64, bool, enum into message, returns the bytes read from the buffer
 fn readVarintIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: []const u8) std.meta.IntToEnumError!u32 {
@@ -148,8 +125,10 @@ fn readVarintIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: []
 }
 
 ///inject fixed32, sfixed32, float, fixed64, sfixed64, double into message, returns the bytes read from the buffer
-fn readNumericIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: []const u8) u32 {
-    const tgt_field_name = @tagName(@intToEnum(T.descriptor_pool, field_number));
+fn readNumericIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: []const u8) !u32 {
+    const tgt_field_enum = try std.meta.intToEnum(T.descriptor_pool, field_number);
+    const tgt_field_name = @tagName(tgt_field_enum);
+
     //std.debug.print("adding value into {s} \n", .{tgt_field_name});
     inline for (@typeInfo(T).Struct.fields) |f| {
         if (std.mem.eql(u8, f.name, tgt_field_name)) {
@@ -189,7 +168,8 @@ fn IsZigZagEncoded(zig_zag_encoded: anytype, field_name: []const u8) bool {
 
 ///inject a type thats represented as a protobuf len, type should be strings, bytes, nested messages
 fn injectLenIntoStruct(comptime T: type, msg: *T, field_number: u64, comptime V: type, value: V, allocator: Allocator) !void {
-    const tgt_field_name = @tagName(@intToEnum(T.descriptor_pool, field_number));
+    const tgt_field_enum = try std.meta.intToEnum(T.descriptor_pool, field_number);
+    const tgt_field_name = @tagName(tgt_field_enum);
 
     //std.debug.print("adding length of {} \n", .{value.len});
     inline for (@typeInfo(T).Struct.fields) |f| {
@@ -272,12 +252,66 @@ fn decodeVarint(comptime T: type, buffer: []const u8) VarIntResult(T) {
     return VarIntResult(T){ .value = value, .bytes_read = index + 1 };
 }
 
+//encoding
+
+
+fn EncodeMessage(comptime T: type, msg: T, writer: anytype) EncodeError!void{
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        if(comptime (std.mem.eql(u8, f.name, "descriptor_pool") or std.mem.eql(u8, f.name, "zig_zag_encoded"))) continue;
+
+        std.debug.print("\nfield {s} type {s}\n", .{f.name, @typeName(f.field_type)});
+
+        const tgt_desc_field = @field(T.descriptor_pool, f.name);
+        const tgt_field_number = @enumToInt(tgt_desc_field);
+
+        const wire_type = GetWireTypeFromField(f.field_type);
+
+        const tag = (tgt_field_number << 3) | @enumToInt(wire_type);
+        try WriteNumeric(u32, tag, writer);
+
+        switch (wire_type) {
+            WireType.VARINT => {
+                std.debug.print("not implemented (varint)\n",.{});
+            },
+            WireType.I32 => {
+                try WriteNumeric(i32, @field(msg, f.name), writer );
+            },
+            else => {
+                std.debug.print("not implemented (else)\n",.{});
+                },
+        }
+
+        std.debug.print("reading from {} got tag {}\n", .{ tgt_desc_field, tag });
+    }
+}
+
+fn GetWireTypeFromField(comptime T: type) WireType {
+    switch(T){
+        u32, u64, bool => return WireType.VARINT,
+        i64 => return WireType.I64,
+        i32 => return WireType.I32,
+        else => { std.debug.print("unhandled type when encoding! {s}\n", .{@typeName(T)}); }
+    }
+    return WireType.VARINT;
+}
 //TODO
 fn AppendVarInt(buffer: []u8, new_val: u64) void {
     while (new_val > 0b1111111) {
         buffer[0] = 0b1000000;
         break;
     }
+}
+
+
+fn WriteNumeric(comptime T: type, value: T, writer: anytype) !void {
+    var buffer : [@sizeOf(T)]u8 = undefined;
+    
+    buffer[0] = @intCast(u8, value >> 24) & 0b11111111;
+    buffer[1] = @intCast(u8, value >> 16) & 0b11111111;
+    buffer[2] = @intCast(u8, value >> 8 ) & 0b11111111;
+    buffer[3] = @intCast(u8, value      ) & 0b11111111;
+
+    _ = try writer.write(&buffer);
 }
 
 //TODO

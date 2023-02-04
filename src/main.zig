@@ -5,16 +5,15 @@ const ProtobufMessage = @import("protobuf.zig").ProtobufMessage;
 const PrintDebugString = @import("protobuf.zig").PrintDebugString;
 
 const expect = std.testing.expect;
-const test_allocator = std.testing.allocator;
 
 test "Decode simple.Test1.1.bin" {
     std.debug.print("\n", .{});
     const message = @import("generated/simple.pb.zig");
 
     const data = try readFile("generated/simple.Test1.1.bin");
-    try expect(std.mem.eql(u8, data, @embedFile("generated/simple.Test1.1.bin"))); 
+    defer std.testing.allocator.free(data);
 
-    defer test_allocator.free(data);
+    try expect(std.mem.eql(u8, data, @embedFile("generated/simple.Test1.1.bin"))); 
 
     var timer = try time.Timer.start();
     const time_0 = timer.read();
@@ -140,19 +139,20 @@ test "Encode simple.Test1.1.bin" {
     const message = @import("generated/simple.pb.zig");
     const msg_1 = message.Test1{ .a = 150 };
 
+    var buffer = std.ArrayList(u8).init(std.testing.allocator);
+    const expected_buffer = @embedFile("generated/simple.Test1.1.bin");
+    defer buffer.deinit();
 
-    _ = ProtobufMessage(message.Test1).SerializeToString(msg_1, std.testing.allocator);
+    try ProtobufMessage(message.Test1).SerializeToWriter(msg_1, buffer.writer());
 
-    //std.debug.print("got: {x}\n", .{std.fmt.fmtSliceHexLower(data)});
-    // try std.testing.expect(std.mem.eql(u8, @embedFile("generated/simple.Test1.1.bin"), data));
-    return error.SkipZigTest;
+    try std.testing.expectEqualSlices(u8, expected_buffer, buffer.items);
 }
 
 fn readFile(comptime tgt_filename: []const u8) ![]u8 {
     const file_ptr: std.fs.File = try (std.fs.cwd().openFile(tgt_filename, std.fs.File.OpenFlags{}));
 
     const stat = try file_ptr.stat();
-    var buffer = try test_allocator.alloc(u8, stat.size);
+    var buffer = try std.testing.allocator.alloc(u8, stat.size);
 
     _ = try file_ptr.reader().readAll(buffer);
 
