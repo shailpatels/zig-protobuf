@@ -36,8 +36,9 @@ private:
     void ProcessMessage(const google::protobuf::Descriptor*, Formatter&) const;
     void ProccessField(const google::protobuf::FieldDescriptor*, Formatter&, bool = false) const; 
     void ProcessEnum(const google::protobuf::EnumDescriptor*, Formatter&) const;
-    void BuildDescriptorPool(const std::map<std::string, u_int>&, const std::vector<std::string>&, Formatter&) const;
+    void BuildDescriptorPool(const std::map<std::string, u_int>&, const std::vector<std::string>&, const std::vector<std::string>&, Formatter&) const;
     bool IsZigZagEncoded(const google::protobuf::FieldDescriptor*) const;
+    bool IsFixedInteger(const google::protobuf::FieldDescriptor*) const; 
 };
 
 }

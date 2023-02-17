@@ -77,7 +77,7 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
     //create the struct definition
     formatter.WriteLine({"pub const ", Formatter::GetZigName(message->name()), " = struct{"}).PushIndent();
     std::map<std::string, u_int> field_names;   //map field names to their proto field number for a descriptor_pool
-    std::vector<std::string> zig_zag_encoded;   //heh 'zig'
+    std::vector<std::string> fixed_ints, zig_zag_encoded;   //heh 'zig'
 
     //handle any nested messages
     for(int i = 0; i < message->nested_type_count(); i++){
@@ -99,6 +99,10 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
             field_names.insert({ field->name(), field->number() });
             if(IsZigZagEncoded(field)){
                 zig_zag_encoded.push_back(field->name());
+            }
+
+            if(IsFixedInteger(field)){
+                fixed_ints.push_back(field->name());
             }
         }
     }
@@ -130,13 +134,13 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
         .WriteLine({"return ProtobufMessage(", Formatter::GetZigName(message->name()), ").ParseFromString(string, allocator);"})
         .PopIndent().WriteLine({"}"});
     
-    formatter.WriteLine({"pub fn SerializeToWriter(message: ", Formatter::GetZigName(message->name()), ", allocator: Allocator) []const u8 {"})
+    formatter.WriteLine({"pub fn SerializeToWriter(message: ", Formatter::GetZigName(message->name()), ", allocator: Allocator) EncodeError!void {"})
         .PushIndent()
         .WriteLine({"return ProtobufMessage(", Formatter::GetZigName(message->name()), ").SerializeToWriter(message, allocator);"})
         .PopIndent().WriteLine({"}"});
 
     //metadata for parsing wire format into this message
-    BuildDescriptorPool(field_names, zig_zag_encoded, formatter);
+    BuildDescriptorPool(field_names, zig_zag_encoded, fixed_ints, formatter);
 
     formatter.PopIndent().WriteLine({"};"});
 }
@@ -243,12 +247,14 @@ void ZigGenerator::ProcessEnum(const google::protobuf::EnumDescriptor* enum_type
 /**
  * Map the field names with their tag numbers so we can perform the lookup when decoding and assigning values
  */
-void ZigGenerator::BuildDescriptorPool(const std::map<std::string, u_int>& field_names, const std::vector<std::string>& zig_zag_encoded, Formatter& formatter) const
+void ZigGenerator::BuildDescriptorPool(const std::map<std::string, u_int>& field_names, const std::vector<std::string>& zig_zag_encoded, 
+                                       const std::vector<std::string>& fixed_ints, Formatter& formatter) const
 {
     //if there are no values, do not create an empty enum set
     if(field_names.size() == 0)
         return;
 
+    //TODO, should use names that would have less collisions with user's field names
     formatter.NewLine().Write({"pub const descriptor_pool = enum(u32){"});
     for(const auto& pair : field_names){
         formatter.NoIndent().Write({Formatter::GetZigName(pair.first), " = ", std::to_string(pair.second)}).Write({","});
@@ -256,6 +262,11 @@ void ZigGenerator::BuildDescriptorPool(const std::map<std::string, u_int>& field
 
     formatter.Write({"};"}).NewLine().UseIndent().Write({"pub const zig_zag_encoded = enum{"});
     for(const auto& field : zig_zag_encoded){
+        formatter.NoIndent().Write({Formatter::GetZigName(field)}).Write({","});
+    }
+
+    formatter.Write({"};"}).NewLine().UseIndent().Write({"pub const fixed_ints = enum{"});
+    for(const auto& field : fixed_ints){
         formatter.NoIndent().Write({Formatter::GetZigName(field)}).Write({","});
     }
 
@@ -271,5 +282,18 @@ bool ZigGenerator::IsZigZagEncoded(const google::protobuf::FieldDescriptor* fiel
     using namespace google::protobuf;
     return field->type() == FieldDescriptor::TYPE_SINT32 || field->type() == FieldDescriptor::TYPE_SINT64;
 }
+
+
+/**
+ * returns if a field is protobuf fixed integer wire type
+ */
+bool ZigGenerator::IsFixedInteger(const google::protobuf::FieldDescriptor* field) const
+{
+    using namespace google::protobuf;
+    return field->type() == FieldDescriptor::TYPE_FIXED32 || field ->type() == FieldDescriptor::TYPE_FIXED64 ||
+           field->type() == FieldDescriptor::TYPE_DOUBLE || field->type() == FieldDescriptor::TYPE_FLOAT ||
+           field->type() == FieldDescriptor::TYPE_SFIXED32 || field->type() == FieldDescriptor::TYPE_SFIXED64;
+}
+
 
 }

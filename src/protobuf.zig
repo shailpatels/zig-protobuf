@@ -44,7 +44,8 @@ fn DecodeMessage(comptime T: type, bytes_read: *u64, buffer: []const u8, allocat
         const wire_type = tag.value & 0b00000111;
         const field_number: u64 = @shrExact(tag.value & 0b11111000, 3);
 
-        //std.debug.print("wire_type: {d}, field_number: {d} pos: {d}\n", .{ wire_type, field_number, position });
+        std.debug.print("{b} tag -> {d}\n",.{tag.value, tag.value});
+        std.debug.print("wire_type: {d}, field_number: {d} pos: {d}\n", .{ wire_type, field_number, position });
 
         if (field_number == 0) {
             //TODO: handle when a field_number doesn't exist in a msg
@@ -68,7 +69,12 @@ fn DecodeMessage(comptime T: type, bytes_read: *u64, buffer: []const u8, allocat
                 const result = decodeVarint(u64, buffer[position..]);
                 position += result.bytes_read;
 
-                try injectLenIntoStruct(T, &message_result, field_number, []const u8, buffer[position .. position + result.value], allocator);
+                injectLenIntoStruct(T, &message_result, field_number, []const u8, buffer[position .. position + result.value], allocator) catch | err | {
+                    if(err == error.OutOfMemory)
+                        return DecodeError.OutOfMemory;
+                    return DecodeError.InvalidField;
+                };
+
                 position += result.value;
             },
             @enumToInt(WireType.I32) => {
@@ -160,6 +166,15 @@ fn IsArray(comptime T: type) bool {
 fn IsZigZagEncoded(zig_zag_encoded: anytype, field_name: []const u8) bool {
     if(comptime std.meta.fields(zig_zag_encoded).len > 0){ 
         _ = std.meta.stringToEnum(zig_zag_encoded, field_name) orelse return false;
+        return true;
+    }else {
+        return false;
+    }
+}
+
+fn IsFixedInteger(fixed_ints: anytype, field_name: []const u8) bool {
+    if(comptime std.meta.fields(fixed_ints).len > 0){ 
+        _ = std.meta.stringToEnum(fixed_ints, field_name) orelse return false;
         return true;
     }else {
         return false;
@@ -264,17 +279,19 @@ fn EncodeMessage(comptime T: type, msg: T, writer: anytype) EncodeError!void{
         const tgt_desc_field = @field(T.descriptor_pool, f.name);
         const tgt_field_number = @enumToInt(tgt_desc_field);
 
-        const wire_type = GetWireTypeFromField(f.field_type);
+        const wire_type = GetWireTypeFromField(f.field_type, IsFixedInteger(T.fixed_ints, f.name));
+        _ = msg;
 
         const tag = (tgt_field_number << 3) | @enumToInt(wire_type);
-        try WriteNumeric(u32, tag, writer);
+        std.debug.print("{b} -> {d}\n", .{tag,tag});
+        try WriteNumeric(u8, @intCast(u8, tag), writer);
 
         switch (wire_type) {
             WireType.VARINT => {
                 std.debug.print("not implemented (varint)\n",.{});
             },
             WireType.I32 => {
-                try WriteNumeric(i32, @field(msg, f.name), writer );
+                //try WriteNumeric(i32, @field(msg, f.name), writer );
             },
             else => {
                 std.debug.print("not implemented (else)\n",.{});
@@ -285,33 +302,32 @@ fn EncodeMessage(comptime T: type, msg: T, writer: anytype) EncodeError!void{
     }
 }
 
-fn GetWireTypeFromField(comptime T: type) WireType {
+
+fn GetWireTypeFromField(comptime T: type, is_fixed_int : bool) WireType {
     switch(T){
         u32, u64, bool => return WireType.VARINT,
-        i64 => return WireType.I64,
-        i32 => return WireType.I32,
+        i64 => return if(is_fixed_int)  WireType.I64 else WireType.VARINT,
+        i32 => return if(is_fixed_int) WireType.I32 else WireType.VARINT,
         else => { std.debug.print("unhandled type when encoding! {s}\n", .{@typeName(T)}); }
     }
     return WireType.VARINT;
 }
-//TODO
-fn AppendVarInt(buffer: []u8, new_val: u64) void {
-    while (new_val > 0b1111111) {
-        buffer[0] = 0b1000000;
-        break;
-    }
-}
-
 
 fn WriteNumeric(comptime T: type, value: T, writer: anytype) !void {
     var buffer : [@sizeOf(T)]u8 = undefined;
     
-    buffer[0] = @intCast(u8, value >> 24) & 0b11111111;
-    buffer[1] = @intCast(u8, value >> 16) & 0b11111111;
-    buffer[2] = @intCast(u8, value >> 8 ) & 0b11111111;
-    buffer[3] = @intCast(u8, value      ) & 0b11111111;
+    //based on https://github.com/ziglang/zig/blob/905c85be968e6823305887474d2a821dac82f16c/lib/std/fmt.zig#L1087
+    var index = buffer.len;
+    while(true)
+    {
+        const digit = value % 10;
+        index -= 1;
+        buffer[index] = @intCast(u8, digit);
 
-    _ = try writer.write(&buffer);
+        if(index == 0) break;
+    }
+
+    _  = try writer.write(&buffer);
 }
 
 //TODO

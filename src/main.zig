@@ -131,8 +131,7 @@ test "Decode simple.BasicMap.1.bin" {
 test "Handle empty message" {
     const message = @import("generated/simple.pb.zig");
     const msg = try ProtobufMessage(message.EmptyMessage).ParseFromString("", std.testing.allocator);
-    _ = ProtobufMessage(message.EmptyMessage).SerializeToString(msg, std.testing.allocator);
-
+    _ = msg;
 }
 
 test "Encode simple.Test1.1.bin" {

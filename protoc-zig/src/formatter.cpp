@@ -51,6 +51,7 @@ Formatter::Formatter(const google::protobuf::FileDescriptor* file, google::proto
         .WriteLine({"const __zig_protobuf = @import(\"protobuf.zig\");"})
         .WriteLine({"const ProtobufMessage = __zig_protobuf.ProtobufMessage;"})
         .WriteLine({"const DecodeError = __zig_protobuf.DecodeError;"})
+        .WriteLine({"const EncodeError = __zig_protobuf.EncodeError;"})
         .WriteLine({"const Allocator = std.mem.Allocator;"});
 
     std::vector<const google::protobuf::FileDescriptor*> output;
