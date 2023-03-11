@@ -12,7 +12,7 @@ test "Decode simple.Test1.1.bin" {
     const message = @import("generated/simple.pb.zig");
 
     const data = try readFile("generated/simple.Test1.1.bin");
-    try expect(std.mem.eql(u8, data, @embedFile("generated/simple.Test1.1.bin"))); 
+    try expect(std.mem.eql(u8, data, @embedFile("generated/simple.Test1.1.bin")));
 
     defer test_allocator.free(data);
 
@@ -97,7 +97,6 @@ test "Decode simple.NestedMessage.1.bin" {
     try expect(std.mem.eql(u8, "hello", msg.a.b));
 }
 
-
 test "Decode simple.RepeatedStrings.1.bin" {
     const message = @import("generated/simple.pb.zig");
 
@@ -105,11 +104,10 @@ test "Decode simple.RepeatedStrings.1.bin" {
     std.debug.print("{x}\n", .{std.fmt.fmtSliceHexLower(data)});
     const msg = try ProtobufMessage(message.RepeatedStrings).ParseFromString(data, std.testing.allocator);
 
-    try expect(std.mem.eql(u8, "first", msg.a.items[0])); 
-    try expect(std.mem.eql(u8, "second", msg.a.items[1])); 
+    try expect(std.mem.eql(u8, "first", msg.a.items[0]));
+    try expect(std.mem.eql(u8, "second", msg.a.items[1]));
     try std.testing.expectEqual(@as(i32, 25), msg.b);
     msg.a.deinit();
-
 }
 
 test "Decode simple.BasicMap.1.bin" {
@@ -119,27 +117,24 @@ test "Decode simple.BasicMap.1.bin" {
     std.debug.print("{x}\n", .{std.fmt.fmtSliceHexLower(data)});
     const msg = try ProtobufMessage(message.BasicMap).ParseFromString(data, std.testing.allocator);
 
-    try expect(std.mem.eql(u8, "A", msg.map_field.items[0].key)); 
-    try expect(std.mem.eql(u8, "B", msg.map_field.items[1].key)); 
-    try expect(std.mem.eql(u8, "C", msg.map_field.items[2].key)); 
+    try expect(std.mem.eql(u8, "A", msg.map_field.items[0].key));
+    try expect(std.mem.eql(u8, "B", msg.map_field.items[1].key));
+    try expect(std.mem.eql(u8, "C", msg.map_field.items[2].key));
     try std.testing.expectEqual(@as(i32, 1), msg.map_field.items[0].value);
     try std.testing.expectEqual(@as(i32, 2), msg.map_field.items[1].value);
     try std.testing.expectEqual(@as(i32, 3), msg.map_field.items[2].value);
     msg.map_field.deinit();
-
 }
 
 test "Handle empty message" {
     const message = @import("generated/simple.pb.zig");
     const msg = try ProtobufMessage(message.EmptyMessage).ParseFromString("", std.testing.allocator);
     _ = ProtobufMessage(message.EmptyMessage).SerializeToString(msg, std.testing.allocator);
-
 }
 
 test "Encode simple.Test1.1.bin" {
     const message = @import("generated/simple.pb.zig");
     const msg_1 = message.Test1{ .a = 150 };
-
 
     _ = ProtobufMessage(message.Test1).SerializeToString(msg_1, std.testing.allocator);
 
