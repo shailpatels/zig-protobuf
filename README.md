@@ -1,5 +1,7 @@
 # Zig-Protobuf
 
+![CI](https://github.com/shailpatels/zig-protobuf/actions/workflows/zig-protobuf.yml/badge.svg)
+
 ## About
 
 Zig-Protobuf is an implementation of [Google's Protocal Buffers (Protobuf)](https://protobuf.dev/). The project
