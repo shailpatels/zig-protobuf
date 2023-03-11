@@ -107,6 +107,12 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
         }
     }
 
+    for(int i = 0; i < message->real_oneof_decl_count(); i++)
+    {
+        //declare a field that can contain the oneof/union created below
+        const google::protobuf::OneofDescriptor* oneof = message->oneof_decl(i);
+        formatter.WriteLine({ Formatter::GetZigName(oneof->name()), ":" ,Formatter::GetZigName(oneof->name()), " = undefined," });
+    }
 
     for(int i = 0; i < message->real_oneof_decl_count(); i++)
     {
@@ -116,12 +122,10 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
 
         for(int j = 0; j < oneof->field_count(); j++)
         {
+            field_names.insert({oneof->field(j)->name(), oneof->field(j)->number()});
+            std::cerr << "adding " << oneof->field(j)->name() << " num " << oneof->field(j)->number() << std::endl;
             ProccessField(oneof->field(j), formatter, true);
-            if(j != oneof->field_count() - 1){
-                formatter.NoIndent().Write({","});
-            }
-
-            formatter.UseIndent().NewLine();
+            formatter.NoIndent().WriteLine({","}).UseIndent();
         }
 
         formatter.PopIndent().WriteLine({"};"});
@@ -134,9 +138,9 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
         .WriteLine({"return ProtobufMessage(", Formatter::GetZigName(message->name()), ").ParseFromString(string, allocator);"})
         .PopIndent().WriteLine({"}"});
     
-    formatter.WriteLine({"pub fn SerializeToWriter(message: ", Formatter::GetZigName(message->name()), ", allocator: Allocator) EncodeError!void {"})
+    formatter.WriteLine({"pub fn SerializeToWriter(message: ", Formatter::GetZigName(message->name()), ", writer: anytype) EncodeError!void {"})
         .PushIndent()
-        .WriteLine({"return ProtobufMessage(", Formatter::GetZigName(message->name()), ").SerializeToWriter(message, allocator);"})
+        .WriteLine({"return ProtobufMessage(", Formatter::GetZigName(message->name()), ").SerializeToWriter(message, writer);"})
         .PopIndent().WriteLine({"}"});
 
     //metadata for parsing wire format into this message

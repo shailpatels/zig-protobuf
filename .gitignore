@@ -4,3 +4,4 @@ generated/*
 .cache
 zig-cache
 zig-out
+conformance/conformance_test_runner
