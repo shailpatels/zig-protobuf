@@ -12,7 +12,6 @@ test "Decode simple.Test1.1.bin" {
 
     const data = try readFile("generated/simple.Test1.1.bin");
     defer std.testing.allocator.free(data);
-
     try expect(std.mem.eql(u8, data, @embedFile("generated/simple.Test1.1.bin")));
 
     var timer = try time.Timer.start();
@@ -138,6 +137,7 @@ test "Decode test.one_of.1.bin" {
 test "Handle empty message" {
     const message = @import("generated/simple.pb.zig");
     const msg = try ProtobufMessage(message.EmptyMessage).ParseFromString("", std.testing.allocator);
+    //_ = ProtobufMessage(message.EmptyMessage).SerializeToString(msg, std.testing.allocator);
     _ = msg;
 }
 

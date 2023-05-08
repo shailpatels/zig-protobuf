@@ -15,11 +15,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-
-    - name: Setup zig
-      run: |
-        sudo snap install zig --classic --beta
-        zig version
+    - uses: goto-bus-stop/setup-zig@v2
+      with:
+        version: 0.11.0-dev.1824+a7a709aaa
 
     # https://github.com/protocolbuffers/protobuf/blob/main/cmake/README.md
     - name: Install Protobuf
