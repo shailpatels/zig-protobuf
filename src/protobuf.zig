@@ -3,7 +3,7 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 pub const DecodeError = error{ InvalidField, InvalidWireType, OutOfMemory };
-pub const EncodeError = error{OutOfMemory};
+pub const EncodeError = error{ OutOfMemory};
 
 //https://protobuf.dev/programming-guides/encoding/#structure
 const WireType = enum(u8) { VARINT, I64, LEN, SGROUP, EGROUP, I32 };
@@ -69,11 +69,7 @@ fn DecodeMessage(comptime T: type, bytes_read: *u64, buffer: []const u8, allocat
                 const result = decodeVarint(u64, buffer[position..]);
                 position += result.bytes_read;
 
-                injectLenIntoStruct(T, &message_result, field_number, []const u8, buffer[position .. position + result.value], allocator) catch |err| {
-                    if (err == error.OutOfMemory) return DecodeError.OutOfMemory;
-                    return DecodeError.InvalidField;
-                };
-
+                try injectLenIntoStruct(T, &message_result, field_number, []const u8, buffer[position .. position + result.value], allocator);
                 position += result.value;
             },
             @enumToInt(WireType.I32) => {
@@ -102,24 +98,24 @@ fn readVarintIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: []
     inline for (@typeInfo(T).Struct.fields) |f| {
         if (std.mem.eql(u8, f.name, tgt_field_name)) {
             var tgt_field = &@field(msg.*, f.name);
-            if (comptime f.field_type == i64 or f.field_type == i32) {
+            if (comptime f.type == i64 or f.type == i32) {
                 var result = decodeVarint(i64, buffer);
                 if (IsZigZagEncoded(T.zig_zag_encoded, tgt_field_name)) {
                     result.value = (result.value >> 1) ^ (-(result.value & 1));
                 }
 
-                tgt_field.* = @intCast(f.field_type, result.value);
+                tgt_field.* = @intCast(f.type, result.value);
                 return result.bytes_read;
-            } else if (comptime f.field_type == u64 or f.field_type == u32) {
+            } else if (comptime f.type == u64 or f.type == u32) {
                 const result = decodeVarint(u64, buffer);
-                tgt_field.* = @intCast(f.field_type, result.value);
+                tgt_field.* = @intCast(f.type, result.value);
                 return result.bytes_read;
-            } else if (comptime f.field_type == bool) {
+            } else if (comptime f.type == bool) {
                 const result = decodeVarint(u64, buffer);
                 @field(msg.*, f.name) = result.value == 1;
                 return result.bytes_read;
             } else {
-                std.debug.print("unhandled varint! {s}\n", .{@typeName(f.field_type)});
+                std.debug.print("unhandled varint! {s}\n", .{@typeName(f.type)});
             }
         }
     }
@@ -135,11 +131,12 @@ fn readNumericIntoStruct(comptime T: type, msg: *T, field_number: u64, buffer: [
     //std.debug.print("adding value into {s} \n", .{tgt_field_name});
     inline for (@typeInfo(T).Struct.fields) |f| {
         if (std.mem.eql(u8, f.name, tgt_field_name)) {
-            if (comptime f.field_type == f64 or f.field_type == f32 or f.field_type == i64 or f.field_type == i32) {
-                const num_bytes = @sizeOf(f.field_type);
+            if (comptime f.type == f64 or f.type == f32 or f.type == i64 or f.type == i32) {
+                const num_bytes = @sizeOf(f.type);
+
                 var cpy_buffer = [_]u8{0} ** num_bytes;
                 std.mem.copy(u8, &cpy_buffer, buffer[0..num_bytes]);
-                var result: *f.field_type = @ptrCast(*f.field_type, @alignCast(num_bytes, &cpy_buffer));
+                var result: *f.type = @ptrCast(*f.type, @alignCast(num_bytes, &cpy_buffer));
                 @field(msg.*, f.name) = result.*;
 
                 return num_bytes;
@@ -178,19 +175,22 @@ fn IsFixedInteger(fixed_ints: anytype, field_name: []const u8) bool {
     }
 }
 
-///inject a type thats represented as a protobuf len, type should be strings, bytes, nested messages
-fn injectLenIntoStruct(comptime T: type, msg: *T, field_number: u64, comptime V: type, value: V, allocator: Allocator) !void {
-    const tgt_field_enum = try std.meta.intToEnum(T.descriptor_pool, field_number);
-    const tgt_field_name = @tagName(tgt_field_enum);
 
+///inject a type thats represented as a protobuf len, type should be strings, bytes, nested messages
+fn injectLenIntoStruct(comptime T: type, msg: *T, field_number: u64, comptime V: type, value: V, allocator: Allocator) DecodeError!void {
+    const tgt_field_enum = std.meta.intToEnum(T.descriptor_pool, field_number) catch {
+        return DecodeError.InvalidField;
+    };
+
+    const tgt_field_name = @tagName(tgt_field_enum);
     //std.debug.print("adding length of {} \n", .{value.len});
     inline for (@typeInfo(T).Struct.fields) |f| {
         //string
         if (std.mem.eql(u8, f.name, tgt_field_name)) {
-            if (comptime V == []const u8 and f.field_type == V) {
+            if (comptime V == []const u8 and f.type == V) {
                 @field(msg.*, f.name) = value;
-            } else if (comptime IsStruct(f.field_type)) {
-                if (comptime IsArray(f.field_type)) {
+            } else if (comptime IsStruct(f.type)) {
+                if (comptime IsArray(f.type)) {
                     //TODO get array_type at comptime
                     const array_type = @typeInfo(@TypeOf(@field(msg.*, f.name).items)).Pointer.child;
                     if (@field(msg.*, f.name).capacity == 0) {
@@ -232,10 +232,10 @@ fn injectLenIntoStruct(comptime T: type, msg: *T, field_number: u64, comptime V:
                 } else {
                     var index: u64 = 0;
                     //assuming its a nested message
-                    @field(msg.*, f.name) = try DecodeMessage(f.field_type, &index, value[index..], allocator);
+                    @field(msg.*, f.name) = try DecodeMessage(f.type, &index, value[index..], allocator);
                 }
             } else {
-                std.debug.print("unhandled len! {s}\n", .{@typeName(f.field_type)});
+                std.debug.print("unhandled len! {s}\n", .{@typeName(f.type)});
             }
         }
     }
@@ -270,19 +270,23 @@ fn EncodeMessage(comptime T: type, msg: T, writer: anytype) EncodeError!void {
     inline for (@typeInfo(T).Struct.fields) |f| {
         if (comptime IsMetaDataField(f.name)) continue;
 
-        std.debug.print("\nfield {s} type {s}\n", .{ f.name, @typeName(f.field_type) });
+        std.debug.print("\nfield {s} type {s}\n", .{ f.name, @typeName(f.type) });
+
+        if (comptime IsUnion(f.type)){
+            continue;
+        }
 
         const tgt_desc_field = @field(T.descriptor_pool, f.name);
         const tgt_field_number = @enumToInt(tgt_desc_field);
 
-        const wire_type = GetWireTypeFromField(f.field_type, IsFixedInteger(T.fixed_ints, f.name));
+        const wire_type = GetWireTypeFromField(f.type, IsFixedInteger(T.fixed_ints, f.name));
         const tag = (tgt_field_number << 3) | @enumToInt(wire_type);
 
         try WriteNumeric(u8, @intCast(u8, tag), writer);
 
         switch (wire_type) {
             WireType.VARINT => {
-                try WriteVarInt(f.field_type, @field(msg, f.name), writer);
+                try WriteVarInt(f.type, @field(msg, f.name), writer);
             },
             WireType.I32 => {
                 try WriteNumeric(i32, @field(msg, f.name), writer);
@@ -298,6 +302,10 @@ fn EncodeMessage(comptime T: type, msg: T, writer: anytype) EncodeError!void {
 
 fn IsMetaDataField(name: []const u8) bool {
     return std.mem.eql(u8, name, "descriptor_pool") or std.mem.eql(u8, name, "descriptor_pool") or std.mem.eql(u8, name, "fixed_ints");
+}
+
+fn IsUnion(comptime T: type) bool {
+    return .Union == @typeInfo(T);
 }
 
 fn GetWireTypeFromField(comptime T: type, is_fixed_int: bool) WireType {
@@ -341,6 +349,7 @@ fn WriteNumeric(comptime T: type, value: T, writer: anytype) !void {
 
     _ = try writer.write(&buffer);
 }
+
 
 //TODO
 pub fn PrintDebugString(comptime T: type, msg: T) []const u8 {

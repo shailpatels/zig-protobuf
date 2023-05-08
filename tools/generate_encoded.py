@@ -115,6 +115,14 @@ test_cases = [
             "p: \"test1\""
             "p: \"test2\""
         ]
+    },
+    {
+        "message_name" : "OneOfTest",
+        "file" : "test.proto",
+        "output_name" : "test.one_of.1.bin",
+        "data" : [
+            "name:\"string is set\""
+        ]
     }
 ]
 

@@ -125,6 +125,16 @@ test "Decode simple.BasicMap.1.bin" {
     msg.map_field.deinit();
 }
 
+test "Decode test.one_of.1.bin" {
+    const message = @import("generated/test.pb.zig");
+
+    const data = @embedFile("generated/test.one_of.1.bin");
+    std.debug.print("{x}\n", .{std.fmt.fmtSliceHexLower(data)});
+    const msg = try ProtobufMessage(message.OneOfTest).ParseFromString(data, std.testing.allocator);
+
+    try expect(std.mem.eql(u8, "string is set", msg.test_oneof.name)); 
+}
+
 test "Handle empty message" {
     const message = @import("generated/simple.pb.zig");
     const msg = try ProtobufMessage(message.EmptyMessage).ParseFromString("", std.testing.allocator);

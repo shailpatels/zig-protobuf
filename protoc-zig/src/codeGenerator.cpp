@@ -118,12 +118,21 @@ void ZigGenerator::ProcessMessage(const google::protobuf::Descriptor* message, F
     {
         //handle any oneofs as a union inside of this struct
         const google::protobuf::OneofDescriptor* oneof = message->oneof_decl(i);
-        formatter.WriteLine({"pub const ", oneof->name(), " = union{" }).PushIndent();
 
+        //build the tags
+        formatter.WriteLine({"pub const ", oneof->name(), "_tag = enum(u32){" }).PushIndent();
         for(int j = 0; j < oneof->field_count(); j++)
         {
             field_names.insert({oneof->field(j)->name(), oneof->field(j)->number()});
-            std::cerr << "adding " << oneof->field(j)->name() << " num " << oneof->field(j)->number() << std::endl;
+            formatter.WriteLine({ Formatter::GetZigName(oneof->field(j)->name()), " = ", std::to_string(oneof->field(j)->number()), "," });
+        }
+        formatter.PopIndent().WriteLine({"};"});
+
+        //build the actual union
+        formatter.WriteLine({"pub const ", oneof->name(), " = union(", oneof->name(), "_tag){" }).PushIndent();
+        for(int j = 0; j < oneof->field_count(); j++)
+        {
+            //field_names.insert({oneof->field(j)->name(), oneof->field(j)->number()});
             ProccessField(oneof->field(j), formatter, true);
             formatter.NoIndent().WriteLine({","}).UseIndent();
         }
@@ -294,8 +303,8 @@ bool ZigGenerator::IsZigZagEncoded(const google::protobuf::FieldDescriptor* fiel
 bool ZigGenerator::IsFixedInteger(const google::protobuf::FieldDescriptor* field) const
 {
     using namespace google::protobuf;
-    return field->type() == FieldDescriptor::TYPE_FIXED32 || field ->type() == FieldDescriptor::TYPE_FIXED64 ||
-           field->type() == FieldDescriptor::TYPE_DOUBLE || field->type() == FieldDescriptor::TYPE_FLOAT ||
+    return field->type() == FieldDescriptor::TYPE_FIXED32  || field->type() == FieldDescriptor::TYPE_FIXED64 ||
+           field->type() == FieldDescriptor::TYPE_DOUBLE   || field->type() == FieldDescriptor::TYPE_FLOAT   ||
            field->type() == FieldDescriptor::TYPE_SFIXED32 || field->type() == FieldDescriptor::TYPE_SFIXED64;
 }
 
