@@ -14,8 +14,6 @@ pub fn build(b: *std.build.Builder) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const main_tests = b.addTest(.{
-        .name = "protobuf tests",
-        .kind = .exe,
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
@@ -24,25 +22,24 @@ pub fn build(b: *std.build.Builder) void {
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&main_tests.step);
 
+    const protobuf = b.dependency("protobuf", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    b.installArtifact(protobuf.artifact("protobuf"));
+
     const zigpb = b.addExecutable(.{
         .name = "zigpb",
         .target = target,
         .optimize = optimize,
     });
 
-    zigpb.addIncludePath("protoc-zig/inc");
-    zigpb.addIncludePath("/usr/local/include");
     zigpb.linkSystemLibrary("c++");
-    zigpb.linkSystemLibrary("protobuf");
-    zigpb.linkSystemLibrary("protoc");
-
     zigpb.addCSourceFiles(
         &.{ "protoc-zig/src/codeGenerator.cpp", "protoc-zig/src/formatter.cpp", "protoc-zig/src/main.cpp" },
         &.{ "-Wall", "-lprotobuf", "-lprotoc", "-pthread", "-std=c++17" },
     );
 
-    zigpb.install();
-
-    const build_zig_protobuf_step = b.step("zigprotobuf", "Compiles the zig-protobuf protoc plugin");
-    build_zig_protobuf_step.dependOn(&zigpb.step);
+    b.installArtifact(zigpb);
 }

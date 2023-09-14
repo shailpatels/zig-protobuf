@@ -1,0 +1,11 @@
+.{
+    .name = "zig-protobuf",
+    .version = "0.0.0",
+
+    .dependencies = .{
+        .protobuf = .{
+            .url = "https://github.com/shailpatels/protobuf/archive/refs/tags/v3.24.0-3524-g743bf9214.tar.gz",
+            .hash = "1220a0ebddb530a8353dcd0c36ac548677d723b7ff8ff0475c921f46912a85c738b3"
+        },
+    },
+}
