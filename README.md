@@ -96,5 +96,5 @@ Once set up you can then run `zig test src/main.zig` or `zig test src/main.zig -
 - So far the zig file generation works only with the proto3 syntax currently and is probably incomplete and will most likely change
 - Haven't done too much on encoding yet
 - In the future would like to support additional features like converting to JSON, gRPC, and proto2 syntax
-- Built with zig version 0.11.0-dev.1929+4ea2f441d
+- Built with zig version 0.12.0-dev.146+020105d0d
 
